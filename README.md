@@ -4,6 +4,10 @@ Yet another `ddclient` clone to work with Cloudflare Dynamic DNS. Because I'm
 bored and `ddclient` failed to install on my Mac for reason I can not comprehend
 (I don't know Perl).
 
+# Tasks
+
+- [ ] Read from config file instead of hardcode values
+
 # License
 
 Copyright 2018 Tung Dao
