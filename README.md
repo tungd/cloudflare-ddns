@@ -4,9 +4,16 @@ Yet another `ddclient` clone to work with Cloudflare Dynamic DNS. Because I'm
 bored and `ddclient` failed to install on my Mac for reason I can not comprehend
 (I don't know Perl).
 
-# Tasks
+# Config
 
-- [ ] Read from config file instead of hardcode values
+`~/.cloudflare-ddns`
+
+```
+interface: en0
+email: me@tungdao.com
+apikey: ed3320f7ce5e08facb4b138778ad4b62960cb
+domain: mbp.tungdao.com
+```
 
 # License
 
