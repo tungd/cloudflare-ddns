@@ -13,7 +13,7 @@ import qualified RIO.Text as T
 
 
 data Config = Config
-  { email :: Text
+  { email  :: Text
   , apikey :: Text
   , domain :: Text
   } deriving (Eq, Show, Generic)
@@ -27,16 +27,16 @@ instance FromJSON a => FromJSON (Result a) where
   parseJSON = withObject "result" $ \o -> Result <$> o .: "result"
 
 data Record = Record
-  { recordId :: Text
-  , recordName :: Text
+  { recordId      :: Text
+  , recordName    :: Text
   , recordContent :: Text
   } deriving (Show, Generic)
 
 instance ToJSON Record where
   toJSON Record{..} = object
-    [ "type" .= ("A" :: Text)
+    [ "type"    .= ("A" :: Text)
     , "proxied" .= False
-    , "name" .= recordName
+    , "name"    .= recordName
     , "content" .= recordContent
     ]
 
@@ -111,14 +111,14 @@ update env Config{..} = do
   where
     runClient_ a = runClientM a env
 
-    listZones_ = listZones (Just email) (Just apikey)
-    listRecords_ = listRecords (Just email) (Just apikey)
-    createRecord_ = createRecord (Just email) (Just apikey)
-    updateRecord_ = updateRecord (Just email) (Just apikey)
+    listZones_     = listZones (Just email) (Just apikey)
+    listRecords_   = listRecords (Just email) (Just apikey)
+    createRecord_  = createRecord (Just email) (Just apikey)
+    updateRecord_  = updateRecord (Just email) (Just apikey)
 
-    filterInterface = filter (\NetworkInterface{..} -> name == "en0")
-    filterZone = filter (\Zone{..} -> T.isSuffixOf zoneName domain)
-    filterRecord = filter (\Record{..} -> recordName == domain)
+    filterInterface  = filter (\NetworkInterface{..} -> name == "en0")
+    filterZone       = filter (\Zone{..} -> T.isSuffixOf zoneName domain)
+    filterRecord     = filter (\Record{..} -> recordName == domain)
 
 resultToList :: Either ServantError (Result [a]) -> [a]
 resultToList = \case
