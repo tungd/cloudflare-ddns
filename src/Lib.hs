@@ -14,7 +14,7 @@ import qualified RIO.Text as T
 
 data Config = Config
   { email :: Text
-  , apiKey :: Text
+  , apikey :: Text
   , domain :: Text
   } deriving (Eq, Show, Generic)
 
@@ -111,10 +111,10 @@ update env Config{..} = do
   where
     runClient_ a = runClientM a env
 
-    listZones_ = listZones (Just email) (Just apiKey)
-    listRecords_ = listRecords (Just email) (Just apiKey)
-    createRecord_ = createRecord (Just email) (Just apiKey)
-    updateRecord_ = updateRecord (Just email) (Just apiKey)
+    listZones_ = listZones (Just email) (Just apikey)
+    listRecords_ = listRecords (Just email) (Just apikey)
+    createRecord_ = createRecord (Just email) (Just apikey)
+    updateRecord_ = updateRecord (Just email) (Just apikey)
 
     filterInterface = filter (\NetworkInterface{..} -> name == "en0")
     filterZone = filter (\Zone{..} -> T.isSuffixOf zoneName domain)

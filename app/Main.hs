@@ -1,20 +1,17 @@
 module Main where
 
-import Lib
+import Data.Yaml
 import Network.HTTP.Client.TLS
 import RIO
 import Servant.Client
+import System.Environment
 
-config :: Config
-config = Config
-  { email = "me@tungdao.com"
-  , apiKey = "ed3320f7ce5e08facb4b138778ad4b62960cb"
-  , domain = "mbp.tungdao.com"
-  }
+import Lib
 
 main :: IO ()
 main = do
   manager <- newTlsManager
   baseUrl <- parseBaseUrl "https://api.cloudflare.com/client/v4/"
-  -- TODO: read in config from yaml file
+  home <- getEnv "HOME"
+  Right config <- decodeFileEither (home <> "/.cloudflare-ddns.yaml")
   update (mkClientEnv manager baseUrl) config
