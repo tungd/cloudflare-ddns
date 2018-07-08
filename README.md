@@ -6,7 +6,7 @@ bored and `ddclient` failed to install on my Mac for reason I can not comprehend
 
 # Config
 
-`~/.cloudflare-ddns`
+`~/.cloudflare-ddns.yaml`
 
 ```
 interface: en0
