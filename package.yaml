@@ -25,7 +25,10 @@ dependencies:
 - aeson
 - yaml
 - servant
-- req
+- servant-client
+- network-info
+- http-client
+- http-client-tls
 
 default-extensions:
 - NoImplicitPrelude
