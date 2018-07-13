@@ -16,6 +16,7 @@ data Config = Config
   { email  :: Text
   , apikey :: Text
   , domain :: Text
+  , interface :: String
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Config
@@ -116,7 +117,7 @@ update env Config{..} = do
     createRecord_  = createRecord (Just email) (Just apikey)
     updateRecord_  = updateRecord (Just email) (Just apikey)
 
-    filterInterface  = filter (\NetworkInterface{..} -> name == "en0")
+    filterInterface  = filter (\NetworkInterface{..} -> name == interface)
     filterZone       = filter (\Zone{..} -> T.isSuffixOf zoneName domain)
     filterRecord     = filter (\Record{..} -> recordName == domain)
 
