@@ -114,7 +114,6 @@ update env config@Config{..} = do
           createRecord config zoneId $ Record "" domain ip
     rs -> error (show rs)
   where
-    runClient_ = flip runClientM
     filterInterface  = filter (\NetworkInterface{..} -> name == interface)
     filterZone       = filter (\Zone{..} -> T.isSuffixOf zoneName domain)
     filterRecord     = filter (\Record{..} -> recordName == domain)
@@ -132,3 +131,6 @@ dropPrefix [] = []
 dropPrefix (x:xs)
   | isUpper x = toLower x : xs
   | otherwise = dropPrefix xs
+
+runClient_ :: ClientEnv -> ClientM a -> IO (Either ServantError a)
+runClient_ = flip runClientM
