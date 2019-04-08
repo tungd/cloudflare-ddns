@@ -26,6 +26,7 @@ dependencies:
 - yaml
 - servant
 - servant-client
+- servant-client-core
 - network-info
 - http-client
 - http-client-tls
@@ -46,6 +47,7 @@ default-extensions:
 - MultiParamTypeClasses
 - FlexibleInstances
 - TypeSynonymInstances
+- TypeFamilies
 
 ghc-options:
 - -Wall

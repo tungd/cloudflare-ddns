@@ -1,23 +1,37 @@
 module Lib where
 
 import Data.Aeson hiding (Result)
-import Data.Proxy
+import Network.HTTP.Client
 import Network.Info
 import RIO
 import RIO.Char
-import Servant.API
+import Servant.API hiding (addHeader)
 import Servant.Client
+import Servant.Client.Core
 import System.IO
 
+import qualified Data.Proxy as Proxy
 import qualified RIO.Text as T
 
 
 data Config = Config
-  { email  :: Text
-  , apikey :: Text
-  , domain :: Text
-  , interface :: String
+  { email     :: !Text
+  , apikey    :: !Text
+  , domain    :: !Text
+  , interface :: !String
   } deriving (Eq, Show, Generic)
+
+data Credentials deriving Typeable
+
+instance (HasClient m api) => HasClient m (Credentials :> api) where
+  type Client m (Credentials :> api) = Config -> Client m api
+
+  clientWithRoute m _ req Config{..} =
+    clientWithRoute m (Proxy.Proxy :: Proxy.Proxy api)
+    $ addHeader "X-Auth-Email" email
+    $ addHeader "X-Auth-Key" apikey req
+
+  hoistClientMonad pm _ nt cl = hoistClientMonad pm (Proxy.Proxy :: Proxy.Proxy api) nt . cl
 
 instance FromJSON Config
 
@@ -51,28 +65,24 @@ instance FromJSON Zone where
   parseJSON = genericParseJSON dropFieldLabelPrefix
 
 type ListZones = "zones"
-  :> Header "X-Auth-Email" Text
-  :> Header "X-Auth-Key" Text
+  :> Credentials
   :> Get '[JSON] (Result [Zone])
 
 type ListRecords = "zones"
-  :> Header "X-Auth-Email" Text
-  :> Header "X-Auth-Key" Text
+  :> Credentials
   :> Capture "zone_uuid" Text
   :> "dns_records"
   :> Get '[JSON] (Result [Record])
 
 type CreateRecord = "zones"
-  :> Header "X-Auth-Email" Text
-  :> Header "X-Auth-Key" Text
+  :> Credentials
   :> Capture "zone_uuid" Text
   :> "dns_records"
   :> ReqBody '[JSON] Record
   :> Post '[JSON] (Result Record)
 
 type UpdateRecord = "zones"
-  :> Header "X-Auth-Email" Text
-  :> Header "X-Auth-Key" Text
+  :> Credentials
   :> Capture "zone_uuid" Text
   :> "dns_records"
   :> Capture "record_uuid" Text
@@ -81,42 +91,30 @@ type UpdateRecord = "zones"
 
 type API = ListZones :<|> ListRecords :<|> CreateRecord :<|> UpdateRecord
 
-listZones ::
-  Maybe Text -> Maybe Text -> ClientM (Result [Zone])
-listRecords ::
-  Maybe Text -> Maybe Text -> Text -> ClientM (Result [Record])
-createRecord ::
-  Maybe Text -> Maybe Text -> Text -> Record -> ClientM (Result Record)
-updateRecord ::
-  Maybe Text -> Maybe Text -> Text -> Text -> Record -> ClientM (Result Record)
+listZones :: Config -> ClientM (Result [Zone])
+listRecords :: Config -> Text -> ClientM (Result [Record])
+createRecord :: Config -> Text -> Record -> ClientM (Result Record)
+updateRecord :: Config -> Text -> Text -> Record -> ClientM (Result Record)
 
 listZones :<|> listRecords :<|> createRecord :<|> updateRecord
-  = client (Proxy :: Proxy API)
+  = client (Proxy.Proxy :: Proxy.Proxy API)
 
 update :: ClientEnv -> Config -> IO ()
-update env Config{..} = do
+update env config@Config{..} = do
   iface <- listToMaybe . filterInterface <$> getNetworkInterfaces
-  zone <- listToMaybe . filterZone . resultToList <$> runClient_ listZones_
+  zone <- listToMaybe . filterZone . resultToList <$> runClient_ env (listZones config)
   case (iface, zone) of
-    (Just NetworkInterface{..}, Just Zone{..}) -> do
+    (Just NetworkInterface{..}, Just Zone{..}) -> void $ runClient_ env $ do
       let ip = T.pack (show ipv4)
-      result <- runClient_ $ do
-        Result records <- listRecords_ zoneId
-        case filterRecord records of
-          (record@Record{..}:_) ->
-            updateRecord_ zoneId recordId $ record { recordContent = ip }
-          [] ->
-            createRecord_ zoneId $ Record "" domain ip
-      liftIO $ print result
+      Result records <- listRecords config zoneId
+      case filterRecord records of
+        (record@Record{..}:_) ->
+          updateRecord config zoneId recordId $ record { recordContent = ip }
+        [] ->
+          createRecord config zoneId $ Record "" domain ip
     rs -> error (show rs)
   where
-    runClient_ a = runClientM a env
-
-    listZones_     = listZones (Just email) (Just apikey)
-    listRecords_   = listRecords (Just email) (Just apikey)
-    createRecord_  = createRecord (Just email) (Just apikey)
-    updateRecord_  = updateRecord (Just email) (Just apikey)
-
+    runClient_ = flip runClientM
     filterInterface  = filter (\NetworkInterface{..} -> name == interface)
     filterZone       = filter (\Zone{..} -> T.isSuffixOf zoneName domain)
     filterRecord     = filter (\Record{..} -> recordName == domain)
