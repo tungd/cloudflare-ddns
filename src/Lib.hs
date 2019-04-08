@@ -1,14 +1,12 @@
 module Lib where
 
 import Data.Aeson hiding (Result)
-import Network.HTTP.Client
 import Network.Info
 import RIO
 import RIO.Char
 import Servant.API hiding (addHeader)
 import Servant.Client
 import Servant.Client.Core
-import System.IO
 
 import qualified Data.Proxy as Proxy
 import qualified RIO.Text as T
@@ -21,18 +19,6 @@ data Config = Config
   , interface :: !String
   } deriving (Eq, Show, Generic)
 
-data Credentials deriving Typeable
-
-instance (HasClient m api) => HasClient m (Credentials :> api) where
-  type Client m (Credentials :> api) = Config -> Client m api
-
-  clientWithRoute m _ req Config{..} =
-    clientWithRoute m (Proxy.Proxy :: Proxy.Proxy api)
-    $ addHeader "X-Auth-Email" email
-    $ addHeader "X-Auth-Key" apikey req
-
-  hoistClientMonad pm _ nt cl = hoistClientMonad pm (Proxy.Proxy :: Proxy.Proxy api) nt . cl
-
 instance FromJSON Config
 
 newtype Result a = Result { result :: a }
@@ -42,9 +28,9 @@ instance FromJSON a => FromJSON (Result a) where
   parseJSON = withObject "result" $ \o -> Result <$> o .: "result"
 
 data Record = Record
-  { recordId      :: Text
-  , recordName    :: Text
-  , recordContent :: Text
+  { recordId      :: !Text
+  , recordName    :: !Text
+  , recordContent :: !Text
   } deriving (Show, Generic)
 
 instance ToJSON Record where
@@ -63,6 +49,18 @@ data Zone = Zone { zoneId :: Text, zoneName :: Text }
 
 instance FromJSON Zone where
   parseJSON = genericParseJSON dropFieldLabelPrefix
+
+data Credentials deriving Typeable
+
+instance (HasClient m api) => HasClient m (Credentials :> api) where
+  type Client m (Credentials :> api) = Config -> Client m api
+
+  clientWithRoute m _ req Config{..} =
+    clientWithRoute m (Proxy.Proxy :: Proxy.Proxy api)
+    $ addHeader "X-Auth-Email" email
+    $ addHeader "X-Auth-Key" apikey req
+
+  hoistClientMonad pm _ nt cl = hoistClientMonad pm (Proxy.Proxy :: Proxy.Proxy api) nt . cl
 
 type ListZones = "zones"
   :> Credentials
@@ -119,9 +117,7 @@ update env config@Config{..} = do
     filterRecord     = filter (\Record{..} -> recordName == domain)
 
 resultToList :: Either ServantError (Result [a]) -> [a]
-resultToList = \case
-  Right (Result rs) -> rs
-  Left _            -> []
+resultToList = either (const []) result
 
 dropFieldLabelPrefix :: Options
 dropFieldLabelPrefix = defaultOptions { fieldLabelModifier = dropPrefix }
