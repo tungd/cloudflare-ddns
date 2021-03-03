@@ -3,7 +3,7 @@ module Main where
 import Data.Yaml
 import Network.HTTP.Client.TLS
 import RIO
-import Servant.Client
+import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Environment
 
 import Lib
@@ -11,7 +11,7 @@ import Lib
 main :: IO ()
 main = do
   manager <- newTlsManager
-  baseUrl <- parseBaseUrl "https://api.cloudflare.com/client/v4/"
+  root <- parseBaseUrl "https://api.cloudflare.com/client/v4/"
   home <- getEnv "HOME"
   Right config <- decodeFileEither (home <> "/.cloudflare-ddns.yaml")
-  update (mkClientEnv manager baseUrl) config
+  update (mkClientEnv manager root) config
