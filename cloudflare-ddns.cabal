@@ -52,6 +52,8 @@ library
                     , http-client
                     , http-client-tls
                     , dns
+                    , record-dot-preprocessor
+                    , record-hasfield
 
 executable cloudflare-ddns
     main-is:          Main.hs

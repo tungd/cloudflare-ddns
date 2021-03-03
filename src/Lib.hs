@@ -1,7 +1,8 @@
+{-# OPTIONS_GHC -fplugin=RecordDotPreprocessor #-}
+{-# LANGUAGE DuplicateRecordFields, UndecidableInstances, GADTs #-}
 module Lib where
 
-import RIO
-import RIO.Char
+import RIO hiding (id)
 import RIO.List (find)
 
 import Data.Aeson hiding (Result)
@@ -10,7 +11,6 @@ import Network.Info
 import Servant.API hiding (addHeader)
 import Servant.Client
 import Servant.Client.Core
-import System.IO
 
 import qualified Data.Proxy as Proxy
 import qualified RIO.Text as T
@@ -52,27 +52,25 @@ instance FromJSON a => FromJSON (Result a) where
   parseJSON = withObject "result" $ \o -> Result <$> o .: "result"
 
 data Record = Record
-  { recordId      :: !Text
-  , recordName    :: !Text
-  , recordContent :: !Text
+  { id      :: !Text
+  , name    :: !Text
+  , content :: !Text
   } deriving (Show, Generic)
 
 instance ToJSON Record where
   toJSON Record{..} = object
     [ "type"    .= ("A" :: Text)
     , "proxied" .= False
-    , "name"    .= recordName
-    , "content" .= recordContent
+    , "name"    .= name
+    , "content" .= content
     ]
 
-instance FromJSON Record where
-  parseJSON = genericParseJSON dropFieldLabelPrefix
+instance FromJSON Record
 
-data Zone = Zone { zoneId :: Text, zoneName :: Text }
+data Zone = Zone { id :: Text, name :: Text }
   deriving (Show, Generic)
 
-instance FromJSON Zone where
-  parseJSON = genericParseJSON dropFieldLabelPrefix
+instance FromJSON Zone
 
 instance (HasClient m api) => HasClient m (Credentials :> api) where
   type Client m (Credentials :> api) = Config -> Client m api
@@ -121,7 +119,7 @@ createRecord :: Config -> Text -> Record -> ClientM (Result Record)
 updateRecord :: Config -> Text -> Text -> Record -> ClientM (Result Record)
 
 listZones :<|> listRecords :<|> createRecord :<|> updateRecord
-  = client (Proxy.Proxy :: Proxy.Proxy API)
+  = client (Proxy.Proxy @API)
 
 showText :: Show a => a -> Text
 showText = T.pack . show
@@ -139,34 +137,25 @@ resolve Public = do
     _ -> pure Nothing
 resolve (Private target) =
   fmap (showText . ipv4)
-  . find (\iface -> T.pack (name iface) == target) <$> getNetworkInterfaces
+  . find (\iface -> T.pack (Network.Info.name iface) == target) <$> getNetworkInterfaces
 
 update :: ClientEnv -> Config -> IO ()
 update env config@Config{..} = do
   iface <- resolve interface
-  zone <- find (\Zone{..} -> T.isSuffixOf zoneName domain)
+  mzone <- find (\zone -> T.isSuffixOf zone.name domain)
     . resultToList <$> runClient_ env (listZones config)
-  case (iface, zone) of
-    (Just ip, Just Zone{..}) -> void $ runClient_ env $ do
-      Result records <- listRecords config zoneId
-      case find (\Record{..} -> recordName == domain) records of
-        Just record@Record{..} ->
-          updateRecord config zoneId recordId (record { recordContent = ip })
+  case (iface, mzone) of
+    (Just ip, Just zone) -> void $ runClient_ env $ do
+      Result records <- listRecords config zone.id
+      case find (\record -> record.name == domain) records of
+        Just record ->
+          updateRecord config zone.id record.id record{content = ip}
         Nothing ->
-          createRecord config zoneId (Record "" domain ip)
+          createRecord config zone.id (Record "" domain ip)
     rs -> error (show rs)
 
 resultToList :: Either ClientError (Result [a]) -> [a]
 resultToList = either (const []) result
-
-dropFieldLabelPrefix :: Options
-dropFieldLabelPrefix = defaultOptions { fieldLabelModifier = dropPrefix }
-
-dropPrefix :: String -> String
-dropPrefix [] = []
-dropPrefix (x:xs)
-  | isUpper x = toLower x : xs
-  | otherwise = dropPrefix xs
 
 runClient_ :: ClientEnv -> ClientM a -> IO (Either ClientError a)
 runClient_ = flip runClientM
