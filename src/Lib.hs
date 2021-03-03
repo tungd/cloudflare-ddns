@@ -3,7 +3,8 @@
 module Lib where
 
 import RIO hiding (id)
-import RIO.List (find)
+import RIO.List as List
+import RIO.Text as T
 
 import Data.Aeson hiding (Result)
 import Network.DNS
@@ -13,7 +14,6 @@ import Servant.Client
 import Servant.Client.Core
 
 import qualified Data.Proxy as Proxy
-import qualified RIO.Text as T
 
 
 data Credentials = AuthToken Text | ApiKey Text Text
@@ -124,7 +124,7 @@ showText = T.pack . show
 
 resolve :: Interface -> IO (Maybe Text)
 resolve (Private target) = fmap (showText . ipv4)
-  . find (\iface -> T.pack (Network.Info.name iface) == target)
+  . List.find (\iface -> T.pack (Network.Info.name iface) == target)
   <$> getNetworkInterfaces
 resolve Public = do
   base <- makeResolvSeed defaultResolvConf
@@ -140,12 +140,12 @@ resolve Public = do
 update :: ClientEnv -> Config -> IO ()
 update env config = do
   iface <- resolve config.interface
-  mzone <- find (\zone -> T.isSuffixOf zone.name config.domain)
+  mzone <- List.find (\zone -> T.isSuffixOf zone.name config.domain)
     . resultToList <$> runClient_ env (listZones config)
   case (iface, mzone) of
     (Just ip, Just zone) -> void $ runClient_ env $ do
       Result records <- listRecords config zone.id
-      case find (\record -> record.name == config.domain) records of
+      case List.find (\record -> record.name == config.domain) records of
         Just record ->
           updateRecord config zone.id record.id record{content = ip}
         Nothing ->
