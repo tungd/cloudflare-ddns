@@ -11,15 +11,29 @@ import Servant.Client.Core
 import qualified Data.Proxy as Proxy
 import qualified RIO.Text as T
 
+data Credentials = AuthToken Text | ApiKey Text Text
+  deriving (Show, Generic, Typeable)
+
+data Interface = Public | Private String
+  deriving (Show, Generic)
 
 data Config = Config
-  { email     :: !Text
-  , apikey    :: !Text
-  , domain    :: !Text
-  , interface :: !String
-  } deriving (Eq, Show, Generic)
+  { domain      :: !Text
+  , interface   :: !Interface
+  , credentials :: !Credentials
+  } deriving (Show, Generic)
 
-instance FromJSON Config
+instance FromJSON Config where
+  parseJSON = withObject "Config" $ \o -> do
+    domain      <- o .: "domain"
+    interface   <- maybe Public Private <$> o .: "interface"
+    credentials <- liftA3 mkcredentials
+      (o .:? "auth") (o .:? "email") (o .:? "apikey")
+    pure Config{..}
+    where
+      mkcredentials (Just token) _ _                   = AuthToken token
+      mkcredentials Nothing (Just email) (Just apikey) = ApiKey email apikey
+      mkcredentials _ _ _                              = error "credentials is required"
 
 newtype Result a = Result { result :: a }
   deriving (Show)
@@ -50,16 +64,17 @@ data Zone = Zone { zoneId :: Text, zoneName :: Text }
 instance FromJSON Zone where
   parseJSON = genericParseJSON dropFieldLabelPrefix
 
-data Credentials = Credentials
-  deriving Typeable
-
 instance (HasClient m api) => HasClient m (Credentials :> api) where
   type Client m (Credentials :> api) = Config -> Client m api
 
-  clientWithRoute m _ req Config{..} =
-    clientWithRoute m (Proxy.Proxy @api)
-    $ addHeader "X-Auth-Email" email
-    $ addHeader "X-Auth-Key" apikey req
+  clientWithRoute m _ req Config{..} = case credentials of
+    ApiKey email apikey ->
+      clientWithRoute m (Proxy.Proxy @api) $ req
+      & addHeader "X-Auth-Email" email
+      & addHeader "X-Auth-Key" apikey
+    AuthToken token ->
+      clientWithRoute m (Proxy.Proxy @api) $ req
+      & addHeader "Authorization" ("Bearer " <> token)
 
   hoistClientMonad pm _ nt cl = hoistClientMonad pm (Proxy.Proxy @api) nt . cl
 
