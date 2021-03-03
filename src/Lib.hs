@@ -57,11 +57,11 @@ instance (HasClient m api) => HasClient m (Credentials :> api) where
   type Client m (Credentials :> api) = Config -> Client m api
 
   clientWithRoute m _ req Config{..} =
-    clientWithRoute m (Proxy.Proxy :: Proxy.Proxy api)
+    clientWithRoute m (Proxy.Proxy @api)
     $ addHeader "X-Auth-Email" email
     $ addHeader "X-Auth-Key" apikey req
 
-  hoistClientMonad pm _ nt cl = hoistClientMonad pm (Proxy.Proxy :: Proxy.Proxy api) nt . cl
+  hoistClientMonad pm _ nt cl = hoistClientMonad pm (Proxy.Proxy @api) nt . cl
 
 type ListZones = "zones"
   :> Credentials

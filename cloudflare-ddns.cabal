@@ -26,7 +26,6 @@ library
     exposed-modules: Lib
     default-extensions: NoImplicitPrelude
                       , OverloadedStrings
-                      , OverloadedLabels
                       , TypeApplications
                       , TypeFamilies
                       , TypeOperators
@@ -38,8 +37,6 @@ library
                       , DeriveAnyClass
                       , NamedFieldPuns
                       , RecordWildCards
-                      , LambdaCase
-                      , DuplicateRecordFields
                       , DataKinds
                       , ScopedTypeVariables
     ghc-options: -Wall
