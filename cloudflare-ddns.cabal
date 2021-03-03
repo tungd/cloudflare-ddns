@@ -60,6 +60,7 @@ executable cloudflare-ddns
     -- LANGUAGE extensions used by modules in this package.
     default-extensions: NoImplicitPrelude
                       , OverloadedStrings
+                      , TypeApplications
     ghc-options: -Wall -O2 -threaded -with-rtsopts=-N
     build-depends:    base ^>=4.14.1.0
                     , rio

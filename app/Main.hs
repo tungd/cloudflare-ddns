@@ -13,5 +13,5 @@ main = do
   manager <- newTlsManager
   root <- parseBaseUrl "https://api.cloudflare.com/client/v4/"
   home <- getEnv "HOME"
-  Right config <- decodeFileEither (home <> "/.cloudflare-ddns.yaml")
-  update (mkClientEnv manager root) config
+  Right config <- decodeFileEither @[Config] (home <> "/.cloudflare-ddns.yaml")
+  for_ config (update (mkClientEnv manager root))
