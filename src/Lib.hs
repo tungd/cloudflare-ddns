@@ -50,7 +50,8 @@ data Zone = Zone { zoneId :: Text, zoneName :: Text }
 instance FromJSON Zone where
   parseJSON = genericParseJSON dropFieldLabelPrefix
 
-data Credentials deriving Typeable
+data Credentials = Credentials
+  deriving Typeable
 
 instance (HasClient m api) => HasClient m (Credentials :> api) where
   type Client m (Credentials :> api) = Config -> Client m api
@@ -116,7 +117,7 @@ update env config@Config{..} = do
     filterZone       = filter (\Zone{..} -> T.isSuffixOf zoneName domain)
     filterRecord     = filter (\Record{..} -> recordName == domain)
 
-resultToList :: Either ServantError (Result [a]) -> [a]
+resultToList :: Either ClientError (Result [a]) -> [a]
 resultToList = either (const []) result
 
 dropFieldLabelPrefix :: Options
@@ -128,5 +129,5 @@ dropPrefix (x:xs)
   | isUpper x = toLower x : xs
   | otherwise = dropPrefix xs
 
-runClient_ :: ClientEnv -> ClientM a -> IO (Either ServantError a)
+runClient_ :: ClientEnv -> ClientM a -> IO (Either ClientError a)
 runClient_ = flip runClientM
