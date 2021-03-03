@@ -9,15 +9,15 @@ bored and `ddclient` failed to install on my Mac for reason I can not comprehend
 `~/.cloudflare-ddns.yaml`
 
 ```
-interface: en0
-email: me@tungdao.com
-apikey: ed3320f7ce5e08facb4b138778ad4b62960cb
-domain: mbp.tungdao.com
+- interface: public
+  email: me@tungdao.com
+  apikey: ed3320f7ce5e08facb4b138778ad4b62960cb
+  domain: mbp.tungdao.com
 ```
 
 # License
 
-Copyright 2018 Tung Dao
+Copyright 2021 Tung Dao
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
 this file except in compliance with the License. You may obtain a copy of the
