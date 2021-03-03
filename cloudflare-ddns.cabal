@@ -39,6 +39,7 @@ library
                       , RecordWildCards
                       , DataKinds
                       , ScopedTypeVariables
+                      , LambdaCase
     ghc-options: -Wall
     build-depends:    base ^>=4.14.1.0
                     , rio
@@ -50,6 +51,7 @@ library
                     , network-info
                     , http-client
                     , http-client-tls
+                    , dns
 
 executable cloudflare-ddns
     main-is:          Main.hs

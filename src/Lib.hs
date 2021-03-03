@@ -1,21 +1,31 @@
 module Lib where
 
-import Data.Aeson hiding (Result)
-import Network.Info
 import RIO
 import RIO.Char
+import RIO.List (find)
+
+import Data.Aeson hiding (Result)
+import Network.DNS
+import Network.Info
 import Servant.API hiding (addHeader)
 import Servant.Client
 import Servant.Client.Core
+import System.IO
 
 import qualified Data.Proxy as Proxy
 import qualified RIO.Text as T
 
+
 data Credentials = AuthToken Text | ApiKey Text Text
   deriving (Show, Generic, Typeable)
 
-data Interface = Public | Private String
+data Interface = Public | Private Text
   deriving (Show, Generic)
+
+instance FromJSON Interface where
+  parseJSON = withText "Interface" $ \case
+    "public" -> pure Public
+    t        -> pure (Private t)
 
 data Config = Config
   { domain      :: !Text
@@ -26,7 +36,7 @@ data Config = Config
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \o -> do
     domain      <- o .: "domain"
-    interface   <- maybe Public Private <$> o .: "interface"
+    interface   <- o .: "interface"
     credentials <- liftA3 mkcredentials
       (o .:? "auth") (o .:? "email") (o .:? "apikey")
     pure Config{..}
@@ -113,24 +123,38 @@ updateRecord :: Config -> Text -> Text -> Record -> ClientM (Result Record)
 listZones :<|> listRecords :<|> createRecord :<|> updateRecord
   = client (Proxy.Proxy :: Proxy.Proxy API)
 
+showText :: Show a => a -> Text
+showText = T.pack . show
+
+resolve :: Interface -> IO (Maybe Text)
+resolve Public = do
+  base <- makeResolvSeed defaultResolvConf
+  rs <- withResolver base $ \resolver -> lookupA resolver "resolver1.opendns.com"
+  case rs of
+    Right opendns -> do
+      custom <- makeResolvSeed defaultResolvConf
+        { resolvInfo = RCHostNames (show <$> opendns) }
+      myip <- withResolver custom $ \resolver -> lookupA resolver "myip.opendns.com"
+      pure $ either (const Nothing) (fmap showText . listToMaybe) myip
+    _ -> pure Nothing
+resolve (Private target) =
+  fmap (showText . ipv4)
+  . find (\iface -> T.pack (name iface) == target) <$> getNetworkInterfaces
+
 update :: ClientEnv -> Config -> IO ()
 update env config@Config{..} = do
-  iface <- listToMaybe . filterInterface <$> getNetworkInterfaces
-  zone <- listToMaybe . filterZone . resultToList <$> runClient_ env (listZones config)
+  iface <- resolve interface
+  zone <- find (\Zone{..} -> T.isSuffixOf zoneName domain)
+    . resultToList <$> runClient_ env (listZones config)
   case (iface, zone) of
-    (Just NetworkInterface{..}, Just Zone{..}) -> void $ runClient_ env $ do
-      let ip = T.pack (show ipv4)
+    (Just ip, Just Zone{..}) -> void $ runClient_ env $ do
       Result records <- listRecords config zoneId
-      case filterRecord records of
-        (record@Record{..}:_) ->
-          updateRecord config zoneId recordId $ record { recordContent = ip }
-        [] ->
-          createRecord config zoneId $ Record "" domain ip
+      case find (\Record{..} -> recordName == domain) records of
+        Just record@Record{..} ->
+          updateRecord config zoneId recordId (record { recordContent = ip })
+        Nothing ->
+          createRecord config zoneId (Record "" domain ip)
     rs -> error (show rs)
-  where
-    filterInterface  = filter (\NetworkInterface{..} -> name == interface)
-    filterZone       = filter (\Zone{..} -> T.isSuffixOf zoneName domain)
-    filterRecord     = filter (\Record{..} -> recordName == domain)
 
 resultToList :: Either ClientError (Result [a]) -> [a]
 resultToList = either (const []) result
