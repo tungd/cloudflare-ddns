@@ -35,8 +35,6 @@ library
                       , GeneralizedNewtypeDeriving
                       , DeriveGeneric
                       , DeriveAnyClass
-                      , NamedFieldPuns
-                      , RecordWildCards
                       , DataKinds
                       , ScopedTypeVariables
                       , LambdaCase

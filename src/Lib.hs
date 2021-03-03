@@ -34,12 +34,10 @@ data Config = Config
   } deriving (Show, Generic)
 
 instance FromJSON Config where
-  parseJSON = withObject "Config" $ \o -> do
-    domain      <- o .: "domain"
-    interface   <- o .: "interface"
-    credentials <- liftA3 mkcredentials
-      (o .:? "auth") (o .:? "email") (o .:? "apikey")
-    pure Config{..}
+  parseJSON = withObject "Config" $ \o -> Config
+    <$> o .: "domain"
+    <*> o .: "interface"
+    <*> liftA3 mkcredentials (o .:? "auth") (o .:? "email") (o .:? "apikey")
     where
       mkcredentials (Just token) _ _                   = AuthToken token
       mkcredentials Nothing (Just email) (Just apikey) = ApiKey email apikey
@@ -58,11 +56,11 @@ data Record = Record
   } deriving (Show, Generic)
 
 instance ToJSON Record where
-  toJSON Record{..} = object
+  toJSON record = object
     [ "type"    .= ("A" :: Text)
     , "proxied" .= False
-    , "name"    .= name
-    , "content" .= content
+    , "name"    .= record.name
+    , "content" .= record.content
     ]
 
 instance FromJSON Record
@@ -75,7 +73,7 @@ instance FromJSON Zone
 instance (HasClient m api) => HasClient m (Credentials :> api) where
   type Client m (Credentials :> api) = Config -> Client m api
 
-  clientWithRoute m _ req Config{..} = case credentials of
+  clientWithRoute m _ req conf = case conf.credentials of
     ApiKey email apikey ->
       clientWithRoute m (Proxy.Proxy @api) $ req
       & addHeader "X-Auth-Email" email
@@ -125,6 +123,9 @@ showText :: Show a => a -> Text
 showText = T.pack . show
 
 resolve :: Interface -> IO (Maybe Text)
+resolve (Private target) = fmap (showText . ipv4)
+  . find (\iface -> T.pack (Network.Info.name iface) == target)
+  <$> getNetworkInterfaces
 resolve Public = do
   base <- makeResolvSeed defaultResolvConf
   rs <- withResolver base $ \resolver -> lookupA resolver "resolver1.opendns.com"
@@ -135,23 +136,20 @@ resolve Public = do
       myip <- withResolver custom $ \resolver -> lookupA resolver "myip.opendns.com"
       pure $ either (const Nothing) (fmap showText . listToMaybe) myip
     _ -> pure Nothing
-resolve (Private target) =
-  fmap (showText . ipv4)
-  . find (\iface -> T.pack (Network.Info.name iface) == target) <$> getNetworkInterfaces
 
 update :: ClientEnv -> Config -> IO ()
-update env config@Config{..} = do
-  iface <- resolve interface
-  mzone <- find (\zone -> T.isSuffixOf zone.name domain)
+update env config = do
+  iface <- resolve config.interface
+  mzone <- find (\zone -> T.isSuffixOf zone.name config.domain)
     . resultToList <$> runClient_ env (listZones config)
   case (iface, mzone) of
     (Just ip, Just zone) -> void $ runClient_ env $ do
       Result records <- listRecords config zone.id
-      case find (\record -> record.name == domain) records of
+      case find (\record -> record.name == config.domain) records of
         Just record ->
           updateRecord config zone.id record.id record{content = ip}
         Nothing ->
-          createRecord config zone.id (Record "" domain ip)
+          createRecord config zone.id (Record "" config.domain ip)
     rs -> error (show rs)
 
 resultToList :: Either ClientError (Result [a]) -> [a]
