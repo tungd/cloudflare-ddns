@@ -15,6 +15,10 @@ bored and `ddclient` failed to install on my Mac for reason I can not comprehend
   domain: mbp.tungdao.com
 ```
 
+# Recent changes
+
+See [ChangeLog](https://github.com/tungd/haskell-cloudflare-ddns/blob/master/ChangeLog.md).
+
 # License
 
 Copyright 2021 Tung Dao
